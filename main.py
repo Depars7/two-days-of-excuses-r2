@@ -52,8 +52,11 @@ def validate(line):
 def write_entry(line):
     """Write the line's exact bytes, with no trailing newline.
 
-    Only the file itself gets a chmod (0644, so the grader can read
-    it as another user). The /output directory is never chmod'ed:
+    The file is created with mode 0644 at open time, so the grader
+    can read it as another user even if the run stops before the
+    chmod below; the chmod stays as a safeguard for a file that
+    already existed with a stricter mode. Only the file itself gets
+    a chmod (0644). The /output directory is never chmod'ed:
     it is not ours, and chmod on it raises PermissionError.
     After writing, the file is read back and its bytes must equal
     the validated line's UTF-8 encoding exactly, so a silent write
@@ -61,7 +64,11 @@ def write_entry(line):
     """
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     expected = line.encode("utf-8")
-    with open(OUTPUT_PATH, "wb") as fh:
+    # Create the file readable (0644) from the first byte: a run cut
+    # short between creation and the chmod below must never leave a
+    # 0600 file the grader cannot read as another user.
+    fd = os.open(OUTPUT_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+    with os.fdopen(fd, "wb") as fh:
         fh.write(expected)
     with open(OUTPUT_PATH, "rb") as fh:
         written = fh.read()
